@@ -220,7 +220,12 @@ void acquisition::Capture::load_cameras() {
         
                 cams.push_back(cam);
                 
-                camera_image_pubs.push_back(it_->advertiseCamera("camera_array/"+cam_names_[j]+"/image_raw", 1));
+                if(j==0)
+                camera_image_pubs.push_back(it_->advertiseCamera("stereo/frame_right/image_raw", 1));
+                else if (j==1)
+                camera_image_pubs.push_back(it_->advertiseCamera("stereo/frame_left/image_raw", 1));
+                else
+                camera_image_pubs.push_back(it_->advertiseCamera("stereo/"+cam_names_[j]+"/image_raw", 1));
                 //camera_info_pubs.push_back(nh_.advertise<sensor_msgs::CameraInfo>("camera_array/"+cam_names_[j]+"/camera_info", 1));
 
                 img_msgs.push_back(sensor_msgs::ImagePtr());
@@ -745,13 +750,13 @@ void acquisition::Capture::init_cameras(bool soft = false) {
                         // in master slave setup. Also in the mode when another sensor such as IMU triggers 
                         // the camera
                     cams[i].setEnumValue("TriggerMode", "On");
-                    cams[i].setEnumValue("LineSelector", "Line3");
-                    cams[i].setEnumValue("TriggerSource", "Line3");
+                    cams[i].setEnumValue("LineSelector", "Line0");
+                    cams[i].setEnumValue("TriggerSource", "Line0");
                     cams[i].setEnumValue("TriggerSelector", "FrameStart");
                     cams[i].setEnumValue("LineMode", "Input");
                     
 //                    cams[i].setFloatValue("TriggerDelay", 40.0);
-                    cams[i].setEnumValue("TriggerOverlap", "ReadOut");//"Off"
+                    cams[i].setEnumValue("TriggerOverlap", "Off");//"Off"
                     cams[i].setEnumValue("TriggerActivation", "RisingEdge");
                 }
             }
@@ -1015,19 +1020,20 @@ void acquisition::Capture::run_soft_trig() {
     }
 
     if(!VERIFY_BINNING_){
-    // Gets called only once, when first image is being triggered
-        for (unsigned int i = 0; i < numCameras_; i++) {
-            //verify if binning is set successfully
-            if (!region_of_interest_set_){
-                ROS_ASSERT_MSG(cams[i].verifyBinning(binning_), " Failed to set Binning= %d, could be either due to Invalid binning value, try changing binning value or due to spinnaker api bug - failing to set lower binning than previously set value - solution: unplug usb camera and re-plug it back and run to node with desired valid binning", binning_);
-            }
-            // warn if full sensor resolution is not same as calibration resolution
-            cams[i].calibrationParamsTest(image_width_,image_height_);
-        }
-    VERIFY_BINNING_ = true;
+    // // Gets called only once, when first image is being triggered
+    //     for (unsigned int i = 0; i < numCameras_; i++) {
+    //         //verify if binning is set successfully
+    //         if (!region_of_interest_set_){
+    //             ROS_ASSERT_MSG(cams[i].verifyBinning(binning_), " Failed to set Binning= %d, could be either due to Invalid binning value, try changing binning value or due to spinnaker api bug - failing to set lower binning than previously set value - solution: unplug usb camera and re-plug it back and run to node with desired valid binning", binning_);
+    //         }
+    //         // warn if full sensor resolution is not same as calibration resolution
+    //         cams[i].calibrationParamsTest(image_width_,image_height_);
+    //     }
+    // VERIFY_BINNING_ = true;
     }
 
-
+    
+   
     ros::Rate ros_rate(soft_framerate_);
     try{
         while( ros::ok() ) {
@@ -1046,36 +1052,36 @@ void acquisition::Capture::run_soft_trig() {
                 }
             }
 
-            int key = cvWaitKey(1);
-            ROS_DEBUG_STREAM("Key press: "<<(key & 255)<<endl);
+            // int key = cvWaitKey(1);
+            // ROS_DEBUG_STREAM("Key press: "<<(key & 255)<<endl);
             
-            if ( (key & 255)!=255 ) {
+            // if ( (key & 255)!=255 ) {
 
-                if ( (key & 255)==83 ) {
-                    if (CAM_<numCameras_-1) // RIGHT ARROW
-                        CAM_++;
-                } else if( (key & 255)==81 ) { // LEFT ARROW
-                    if (CAM_>0)
-                        CAM_--;
-                } else if( (key & 255)==32 && !SAVE_) { // SPACE
-                    ROS_INFO_STREAM("Saving frame...");
-                    if (SAVE_BIN_)
-                        save_binary_frames(0);
-                    else{
-                        save_mat_frames(0);
-                        if (!EXPORT_TO_ROS_){
-                            ROS_INFO_STREAM("Exporting frames to ROS...");
-                            export_to_ROS();
-                        }
-                    }
-                } else if( (key & 255)==27 ) {  // ESC
-                    ROS_INFO_STREAM("Terminating...");
-                    cvDestroyAllWindows();
-                    ros::shutdown();
-                    break;
-                }
-                ROS_DEBUG_STREAM("active cam switched to: "<<CAM_);
-            }
+            //     if ( (key & 255)==83 ) {
+            //         if (CAM_<numCameras_-1) // RIGHT ARROW
+            //             CAM_++;
+            //     } else if( (key & 255)==81 ) { // LEFT ARROW
+            //         if (CAM_>0)
+            //             CAM_--;
+            //     } else if( (key & 255)==32 && !SAVE_) { // SPACE
+            //         ROS_INFO_STREAM("Saving frame...");
+            //         if (SAVE_BIN_)
+            //             save_binary_frames(0);
+            //         else{
+            //             save_mat_frames(0);
+            //             if (!EXPORT_TO_ROS_){
+            //                 ROS_INFO_STREAM("Exporting frames to ROS...");
+            //                 export_to_ROS();
+            //             }
+            //         }
+            //     } else if( (key & 255)==27 ) {  // ESC
+            //         ROS_INFO_STREAM("Terminating...");
+            //         cvDestroyAllWindows();
+            //         ros::shutdown();
+            //         break;
+            //     }
+            //     ROS_DEBUG_STREAM("active cam switched to: "<<CAM_);
+            // }
 
             double disp_time_ = ros::Time::now().toSec() - t;
 
