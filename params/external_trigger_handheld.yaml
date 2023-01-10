@@ -1,13 +1,9 @@
 cam_ids:
 - 21174981
 - 21177687
-- 21137010
-- 21174973
 cam_aliases:
 - cam0
 - cam1
-- cam2
-- cam3
 skip: 20
 delay: 1.0
 

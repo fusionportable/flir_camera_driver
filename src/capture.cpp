@@ -220,10 +220,15 @@ void acquisition::Capture::load_cameras() {
         
                 cams.push_back(cam);
                 
+                //** define topic name of each camera
                 if(j==0)
                 camera_image_pubs.push_back(it_->advertiseCamera("stereo/frame_right/image_raw", 1));
                 else if (j==1)
                 camera_image_pubs.push_back(it_->advertiseCamera("stereo/frame_left/image_raw", 1));
+                else if (j==2)
+                camera_image_pubs.push_back(it_->advertiseCamera("stereo/vehicle_frame_left/image_raw", 1));
+                else if (j==3)
+                camera_image_pubs.push_back(it_->advertiseCamera("stereo/vehicle_frame_right/image_raw", 1));
                 else
                 camera_image_pubs.push_back(it_->advertiseCamera("stereo/"+cam_names_[j]+"/image_raw", 1));
                 //camera_info_pubs.push_back(nh_.advertise<sensor_msgs::CameraInfo>("camera_array/"+cam_names_[j]+"/camera_info", 1));
