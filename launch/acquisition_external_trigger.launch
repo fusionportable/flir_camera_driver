@@ -2,10 +2,12 @@
   <!-- configure console output verbosity mode:debug_console.conf or std_console.conf -->
   <env name="ROSCONSOLE_CONFIG_FILE" value="$(find spinnaker_sdk_camera_driver)/cfg/std_console.conf"/>
 
-  <!-- acquisition spinnaker params-->
+  <!-- acquisition spinnaker params--> 
+  <!-- gogojjh: can change for different experiments -->
+  <arg name="exposure_time"     default="0"      doc="Exposure_time setting for cameras"/>
+  <!-- gogojjh: do not change, please modify them using SpinView -->
   <arg name="binning"           default="1"      doc="Binning for cameras, when changing from 2 to 1 cameras need to be unplugged and replugged"/>
   <arg name="color"             default="true"   doc="Should color images be used (only works on models that support color images)"/>
-  <arg name="exposure_time"     default="0"      doc="Exposure_time setting for cameras"/>
   <arg name="external_trigger"  default="true"   doc="External trigger (No camera is master)"/>
   <arg name="gain"              default="0"      doc="Gain setting. Gain should be positive (full range - 0 - 18 dB for blackfly-s camera) 
                                                       or zero (auto gain). if gain > max, it will be set to max allowed value.
@@ -26,7 +28,6 @@
   <arg name="to_ros"            default="true"   doc="Flag whether images should be published to ROS" />
   <arg name="utstamps"          default="true"   doc="Flag whether each image should have Unique timestamps vs the master cams time stamp for all" />
   <arg name="max_rate_save"     default="false"  doc="Flag for max rate mode which is when the master triggerst the slaves and saves images at maximum rate possible" />
-
 
   <!-- nodelet manager params-->
   <arg name="manager" default="vision_nodelet_manager" doc="name of the nodelet manager, comes handy when launching multiple nodelets from different launch files" />

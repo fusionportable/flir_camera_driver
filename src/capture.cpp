@@ -223,20 +223,42 @@ void acquisition::Capture::load_cameras() {
                 frame_chunk_data_.push_back(chunk_data);
                 cams.push_back(cam);              
                 if(j == 0){
-                    camera_image_pubs.push_back(it_->advertise("stereo/frame_left/image_raw", 1));
+                    camera_image_pubs.push_back(it_->advertise("/stereo/frame_left/image_raw", 1));
                 }
                 else if (j == 1) {
-                    camera_image_pubs.push_back(it_->advertise("stereo/frame_right/image_raw", 1));
+                    camera_image_pubs.push_back(it_->advertise("/stereo/frame_right/image_raw", 1));
                 }
                 else if (j == 2) {
-                    camera_image_pubs.push_back(it_->advertise("stereo/vehicle_frame_left/image_raw", 1));
+                    camera_image_pubs.push_back(it_->advertise("/stereo/vehicle_frame_left/image_raw", 1));
                 }
                 else if (j == 3) {
-                    camera_image_pubs.push_back(it_->advertise("stereo/vehicle_frame_right/image_raw", 1));
+                    camera_image_pubs.push_back(it_->advertise("/stereo/vehicle_frame_right/image_raw", 1));
                 }
                 else {
-                    camera_image_pubs.push_back(it_->advertise("stereo/"+cam_names_[j]+"/image_raw", 1));
+                    camera_image_pubs.push_back(it_->advertise("/stereo/"+cam_names_[j]+"/image_raw", 1));
                 }
+
+                if(j == 0){
+                    camera_chunk_data_pubs.push_back(
+                        nh_.advertise<geometry_msgs::PointStamped>("/stereo/frame_left/image_chunk_data", 1));
+                }
+                else if (j == 1) {
+                    camera_chunk_data_pubs.push_back(
+                        nh_.advertise<geometry_msgs::PointStamped>("/stereo/frame_right/image_chunk_data", 1));
+                }
+                else if (j == 2) {
+                    camera_chunk_data_pubs.push_back(
+                        nh_.advertise<geometry_msgs::PointStamped>("/stereo/vehicle_frame_left/image_chunk_data", 1));
+                }
+                else if (j == 3) {
+                    camera_chunk_data_pubs.push_back(
+                        nh_.advertise<geometry_msgs::PointStamped>("/stereo/vehicle_frame_right/image_chunk_data", 1));
+                }
+                else {
+                    camera_chunk_data_pubs.push_back(
+                        nh_.advertise<geometry_msgs::PointStamped>("/stereo/" + cam_names_[j] + "/image_chunk_data", 1));
+                }
+
                 img_msgs.push_back(sensor_msgs::ImagePtr());
                 cam_counter++;
             }
@@ -803,9 +825,7 @@ void acquisition::Capture::save_mat_frames(int dump) {
 }
 
 void acquisition::Capture::export_to_ROS() {
-    double t = ros::Time::now().toSec();
     std_msgs::Header img_msg_header;
-    
     #ifdef trigger_msgs_FOUND
         if (EXTERNAL_TRIGGER_){
             if (latest_imu_trigger_count_ - prev_imu_trigger_count_ > 1 ){
@@ -828,6 +848,7 @@ void acquisition::Capture::export_to_ROS() {
         }
     #endif
 
+    // NOTE(gogojjh): not define trigger_msgs_FOUND in default
     #ifndef trigger_msgs_FOUND
         img_msg_header.stamp = mesg.header.stamp;
     #endif
@@ -856,7 +877,6 @@ void acquisition::Capture::export_to_ROS() {
             img_msgs[i] = cv_bridge::CvImage(img_msg_header, "mono8", frames_[i]).toImageMsg();
         camera_image_pubs[i].publish(img_msgs[i]);
     }
-    export_to_ROS_time_ = ros::Time::now().toSec() - t;
 }
 
 void acquisition::Capture::save_binary_frames(int dump) {
@@ -897,23 +917,18 @@ void acquisition::Capture::save_binary_frames(int dump) {
     
 }
 
-// TODO(gogojjh): use parallel thread to capture different images
 void acquisition::Capture::get_mat_images() {
-    double t = ros::Time::now().toSec();   
     ostringstream ss;
     ss << "frameIDs: [";
     int frameID;
     int fid_mismatch = 0;
     for (int i = 0; i < numCameras_; i++) {
-        // NOTE(gogojjh):
         ImagePtr image = cams[i].grab_frame();
         ChunkData chunkdata = image->GetChunkData();
         frame_chunk_data_[i].exposure_time_ = static_cast<double>(chunkdata.GetExposureTime()) / 1000.0;
         frame_chunk_data_[i].gain_ = chunkdata.GetGain();
         std::cout << " camera: exposure: "<< frame_chunk_data_[i].exposure_time_ 
                   << "ms; gain: "<< frame_chunk_data_[i].gain_<< "dB" << std::endl;        
-        double get_image_time = ros::Time::now().toSec();
-        double cap_image_time = get_image_time - frame_chunk_data_[i].exposure_time_ / 2 / 1000.0;
 
         // frames_[i] = cams[i].grab_mat_frame(frame_chunk_data_[i]);
         frames_[i] = cams[i].convert_to_mat(image);
@@ -936,7 +951,80 @@ void acquisition::Capture::get_mat_images() {
     ROS_DEBUG_STREAM(message);
     if (fid_mismatch)
         ROS_WARN_STREAM("Frame IDs for grabbed set of images did not match!");  
-    toMat_time_ = ros::Time::now().toSec() - t;   
+}
+
+void acquisition::Capture::export_image_to_ROS(const int i) {
+    double t = ros::Time::now().toSec();
+
+    // Capture new image using the Spinnaker API
+    ImagePtr image = cams[i].grab_frame();
+    ChunkData chunkdata = image->GetChunkData();
+    frame_chunk_data_[i].exposure_time_ = static_cast<double>(chunkdata.GetExposureTime()) / 1000.0;
+    frame_chunk_data_[i].gain_ = chunkdata.GetGain();
+    double get_image_time = ros::Time::now().toSec();
+    double cap_image_time = get_image_time - frame_chunk_data_[i].exposure_time_ / 2 / 1000.0;
+    // std::cout << i << ": camera: exposure: "<< frame_chunk_data_[i].exposure_time_ 
+    //           << "ms; gain: "<< frame_chunk_data_[i].gain_<< "dB; "  
+    //           << std::fixed << std::setprecision(9) << cap_image_time << std::endl;
+
+    // Convert the image to OpenCV Mat
+    frames_[i] = cams[i].convert_to_mat(image);
+    // NOTE(gogojjh): comment this line since the cameras' internal time is not synchonrized with the PC
+    // time_stamps_[i] = cams[i].get_time_stamp();
+
+    // Publish ROS message
+    std_msgs::Header img_msg_header;
+    img_msg_header.stamp = ros::Time().fromSec(cap_image_time);
+
+    // #ifdef trigger_msgs_FOUND
+    //     if (EXTERNAL_TRIGGER_) {
+    //         if (latest_imu_trigger_count_ - prev_imu_trigger_count_ > 1 ){
+    //             ROS_WARN("Difference in trigger count more than 1, latest_count = %d and prev_count = %d",latest_imu_trigger_count_,prev_imu_trigger_count_);
+    //         }
+
+    //         else if (latest_imu_trigger_count_ - prev_imu_trigger_count_ == 0){
+    //             double wait_time_start = ros::Time::now().toSec();
+    //             ROS_WARN("Difference in trigger count zero, latest_count = %d and prev_count = %d",latest_imu_trigger_count_,prev_imu_trigger_count_);
+    //             while (latest_imu_trigger_count_ - prev_imu_trigger_count_ == 0) {
+    //                 ros::Duration(0.0001).sleep();
+    //             }
+    //             ROS_INFO_STREAM("Time gap for sync messages: " << ros::Time::now().toSec() - wait_time_start);
+    //         }
+    //         img_msg_header.stamp = latest_imu_trigger_time_;
+    //         prev_imu_trigger_count_ = latest_imu_trigger_count_;
+    //     }
+    //     else {
+    //         img_msg_header.stamp = mesg.header.stamp;
+    //     }
+    // #endif
+    // // add exposure time
+
+    // #ifndef trigger_msgs_FOUND
+    //     img_msg_header.stamp = mesg.header.stamp;
+    // #endif
+
+    if (i == 0) {
+        img_msg_header.frame_id = "frame_cam00";
+    } else if (i == 1) {
+        img_msg_header.frame_id = "frame_cam01";
+    } else if (i == 2) {
+        img_msg_header.frame_id = "vehicle_frame_cam00";
+    } else if (i == 3) {
+        img_msg_header.frame_id = "vehicle_frame_cam01";
+    }
+    if (color_)
+        img_msgs[i] = cv_bridge::CvImage(img_msg_header, "bgr8", frames_[i]).toImageMsg();
+    else
+        img_msgs[i] = cv_bridge::CvImage(img_msg_header, "mono8", frames_[i]).toImageMsg();
+    camera_image_pubs[i].publish(img_msgs[i]);
+
+    geometry_msgs::PointStamped msg;
+    msg.header = img_msg_header;
+    msg.point.x = frame_chunk_data_[i].exposure_time_;
+    msg.point.y = frame_chunk_data_[i].gain_;
+    camera_chunk_data_pubs[i].publish(msg);
+
+    // printf("(in parallel) export to ROS_Times (ms): %.1f\n", (ros::Time::now().toSec() - t) * 1000);
 }
 
 void acquisition::Capture::run_soft_trig() {
@@ -951,37 +1039,76 @@ void acquisition::Capture::run_soft_trig() {
     }  
     get_mat_images();
    
-    // NOTE(gogojjh): the main program
     ros::Rate ros_rate(soft_framerate_);
     try{
         while (ros::ok() ) {
             double t = ros::Time::now().toSec();
-            double disp_time_ = ros::Time::now().toSec() - t;
 
             // Call update functions
             if (!EXTERNAL_TRIGGER_) {
                 cams[MASTER_CAM_].trigger();
             }
-            get_mat_images();
 
-            if (EXPORT_TO_ROS_) export_to_ROS();
+            double t1 = ros::Time::now().toSec();   
+            get_mat_images();
+            toMat_time_ = ros::Time::now().toSec() - t1;
+
+            if (EXPORT_TO_ROS_) {
+                double t2 = ros::Time::now().toSec();
+                export_to_ROS();
+                export_to_ROS_time_ = ros::Time::now().toSec() - t2;
+            }
             // cams[MASTER_CAM_].targetGreyValueTest();
 
             // ros publishing messages
             acquisition_pub.publish(mesg);
 
-            // double total_time = grab_time_ + toMat_time_ + disp_time_ + save_mat_time_;
-            double total_time = toMat_time_ + disp_time_ + save_mat_time_ + export_to_ROS_time_;
+            double total_time = toMat_time_ + export_to_ROS_time_;
             achieved_time_ = ros::Time::now().toSec() - achieved_time_;
 
             ROS_INFO_COND(TIME_BENCHMARK_,
                           "total time (ms): %.1f \tPossible FPS: %.1f\tActual FPS: %.1f",
-                          total_time*1000,1/total_time,1/achieved_time_);
+                          total_time*1000, 1/total_time, 1/achieved_time_);
             
-            ROS_INFO_COND(TIME_BENCHMARK_,"Times (ms):- grab: %.1f, disp: %.1f, save: %.1f, exp2ROS: %.1f",
-                          toMat_time_*1000,disp_time_*1000,save_mat_time_*1000,export_to_ROS_time_*1000);
+            ROS_INFO_COND(TIME_BENCHMARK_,"Times (ms):- grab: %.1f, exp2ROS: %.1f",
+                          toMat_time_*1000, export_to_ROS_time_*1000);
             
             achieved_time_=ros::Time::now().toSec();           
+            if (!EXTERNAL_TRIGGER_ && SOFT_FRAME_RATE_CTRL_) {ros_rate.sleep();}
+        }
+    }
+    catch(const std::exception &e){
+        ROS_FATAL_STREAM("Exception: "<<e.what());
+    }
+    catch(...){
+        ROS_FATAL_STREAM("Some unknown exception occured. \v Exiting gracefully, \n  possible reason could be Camera Disconnection...");
+    }
+    ros::shutdown();
+    //raise(SIGINT);
+}
+
+// NOTE(gogojjh): The main function iteratively captures images in parallel
+// Assumption: 
+//  EXTERNAL_TRIGGER_ = true; // external trigger
+//  EXPORT_TO_ROS_ = true;    // export data to ros
+void acquisition::Capture::run_soft_trig_in_parallel() {
+    ROS_INFO("*** ACQUISITION ***");
+    start_acquisition();
+    ros::Rate ros_rate(soft_framerate_);
+    try{
+        while (ros::ok() ) {
+            double t = ros::Time::now().toSec();
+
+            std::vector<std::thread> threads_image_to_ROS;
+            for (int i = 0; i < numCameras_; i++) {    
+                threads_image_to_ROS.emplace_back(&acquisition::Capture::export_image_to_ROS, this, i);               
+            }
+
+            for (auto &thread : threads_image_to_ROS) {
+                thread.join();
+            }
+            double total_time = ros::Time::now().toSec() - t;
+            printf("export_image_to_ROS Times (ms): %.1f\n", total_time * 1000);
             if (!EXTERNAL_TRIGGER_ && SOFT_FRAME_RATE_CTRL_) {ros_rate.sleep();}
         }
     }
@@ -1215,10 +1342,13 @@ void acquisition::Capture::run_mt() {
 }
 
 void acquisition::Capture::run() {
-    if (MAX_RATE_SAVE_)
+    if (MAX_RATE_SAVE_) {
         run_mt();
-    else
-        run_soft_trig();
+    } else {
+        // run_soft_trig();
+        // NOTE(gogojjh):
+        run_soft_trig_in_parallel();
+    }
     ROS_DEBUG("Run completed");
 }
 

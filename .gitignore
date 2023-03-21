@@ -44,3 +44,5 @@ include/spinnaker_sdk_camera_driver/spinnaker_configure.h
 
 # ignore avi
 *.avi
+
+test/*

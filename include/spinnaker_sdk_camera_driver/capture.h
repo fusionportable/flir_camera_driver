@@ -23,6 +23,11 @@
 #include <nodelet/loader.h>
 #include "pluginlib/class_list_macros.h"
 
+#include <thread>
+#include <mutex>
+#include <iomanip> 
+#include <geometry_msgs/PointStamped.h>
+
 #ifdef trigger_msgs_FOUND
   #include <trigger_msgs/sync_trigger.h>
 #endif 
@@ -56,6 +61,7 @@ namespace acquisition {
         void run();
         void run_external_trig();
         void run_soft_trig();
+        void run_soft_trig_in_parallel();
         void run_mt();
         void publish_to_ros(int, char**, float);
 
@@ -76,6 +82,7 @@ namespace acquisition {
         void get_mat_images();
         void update_grid();
         void export_to_ROS();
+        void export_image_to_ROS(const int i);
         void dynamicReconfigureCallback(spinnaker_sdk_camera_driver::spinnaker_camConfig &config, uint32_t level);
        
         float mem_usage();
@@ -182,6 +189,7 @@ namespace acquisition {
         // vector<image_transport::CameraPublisher> camera_image_pubs;
         // vector<ros::Publisher> camera_info_pubs;
         vector<image_transport::Publisher> camera_image_pubs;
+        vector<ros::Publisher> camera_chunk_data_pubs;
 		
         vector<sensor_msgs::ImagePtr> img_msgs;
         vector<sensor_msgs::CameraInfoPtr> cam_info_msgs;
