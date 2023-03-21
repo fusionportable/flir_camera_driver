@@ -82,6 +82,7 @@ namespace acquisition {
     
         SystemPtr system_;    
         CameraList camList_;
+        // NOTE(gogojjh): record all cameras 
         vector<acquisition::Camera> cams;
         vector<string> cam_ids_;
         vector<string> cam_names_;
@@ -91,7 +92,8 @@ namespace acquisition {
         vector<ImagePtr> pResultImages_;
         vector<Mat> frames_;
         vector<string> time_stamps_;
-        vector< vector<Mat> > mem_frames_;
+        vector<fp::ChunkData> frame_chunk_data_;
+        vector<vector<Mat> > mem_frames_;
         vector<vector<double>> intrinsic_coeff_vec_;
         vector<vector<double>> distortion_coeff_vec_;
         vector<vector<double>> rect_coeff_vec_;
@@ -176,10 +178,10 @@ namespace acquisition {
         dynamic_reconfigure::Server<spinnaker_sdk_camera_driver::spinnaker_camConfig>* dynamicReCfgServer_;
 
         ros::Publisher acquisition_pub;
-        //vector<ros::Publisher> camera_image_pubs;
-        vector<image_transport::CameraPublisher> camera_image_pubs;
-        //vector<ros::Publisher> camera_info_pubs;
-
+        // vector<ros::Publisher> camera_image_pubs;
+        // vector<image_transport::CameraPublisher> camera_image_pubs;
+        // vector<ros::Publisher> camera_info_pubs;
+        vector<image_transport::Publisher> camera_image_pubs;
 		
         vector<sensor_msgs::ImagePtr> img_msgs;
         vector<sensor_msgs::CameraInfoPtr> cam_info_msgs;

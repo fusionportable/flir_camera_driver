@@ -41,15 +41,11 @@ ImagePtr acquisition::Camera::grab_frame() {
     try{
         pResultImage = pCam_->GetNextImage(GET_NEXT_IMAGE_TIMEOUT_);
         // Check if the Image is complete
-
         if (pResultImage->IsIncomplete()) {
-
             ROS_WARN_STREAM("Image incomplete with image status " << pResultImage->GetImageStatus() << "!");
 
         } else {
-
             timestamp_ = pResultImage->GetTimeStamp();
-
             if (frameID_ >= 0) {
                 lastFrameID_ = frameID_;
                 frameID_ = pResultImage->GetFrameID();
@@ -60,7 +56,6 @@ ImagePtr acquisition::Camera::grab_frame() {
             }
 
         }
-
         ROS_DEBUG_STREAM("Grabbed frame from camera " << get_id() << " with timestamp " << timestamp_*1000);
         return pResultImage;
     }
@@ -73,30 +68,24 @@ ImagePtr acquisition::Camera::grab_frame() {
 
 // Returns last timestamp
 string acquisition::Camera::get_time_stamp() {
-
     stringstream ss;
-    ss<<timestamp_*1000;
+    ss << timestamp_ * 1000;
     return ss.str();
 
 }
 
 int acquisition::Camera::get_frame_id() {
-
     return frameID_;
-
 }
 
 Mat acquisition::Camera::grab_mat_frame() {
-
-    try{
+    try {
         ImagePtr pResultImage = grab_frame();
         return convert_to_mat(pResultImage);
     }
     catch(Spinnaker::Exception &e){
         ros::shutdown();
     }
-
-
 }
 
 Mat acquisition::Camera::convert_to_mat(ImagePtr pImage) {
@@ -110,15 +99,13 @@ Mat acquisition::Camera::convert_to_mat(ImagePtr pImage) {
     unsigned int YPadding = convertedImage->GetYPadding();
     unsigned int rowsize = convertedImage->GetWidth();
     unsigned int colsize = convertedImage->GetHeight();
-    //image data contains padding. When allocating Mat container size, you need to account for the X,Y image data padding.
+    // image data contains padding. When allocating Mat container size, you need to account for the X,Y image data padding.
     Mat img;
     if (COLOR_)
         img = Mat(colsize + YPadding, rowsize + XPadding, CV_8UC3, convertedImage->GetData(), convertedImage->GetStride());
     else
         img = Mat(colsize + YPadding, rowsize + XPadding, CV_8UC1, convertedImage->GetData(), convertedImage->GetStride());
     return img.clone();
-    // return img;
-    
 }
 
 void acquisition::Camera::begin_acquisition() {
@@ -139,7 +126,6 @@ void acquisition::Camera::end_acquisition() {
 }
 
 void acquisition::Camera::setEnumValue(string setting, string value) {
-
     INodeMap & nodeMap = pCam_->GetNodeMap();
     
     // Retrieve enumeration node from nodemap
@@ -159,7 +145,6 @@ void acquisition::Camera::setEnumValue(string setting, string value) {
     ptr->SetIntValue(valueToSet);    
 
     ROS_DEBUG_STREAM(setting << " set to " << value);
-    
 }
 
 void acquisition::Camera::setIntValue(string setting, int val) {
@@ -354,10 +339,10 @@ void acquisition::Camera::exposureTest() {
         ROS_FATAL_STREAM("Unable to set exposure " << "). Aborting..." << endl << endl);
         return ;
     }
-    float expTime=ptrExpTest->GetValue();
-    ROS_DEBUG_STREAM("Exposure Time: "<<expTime<<endl);
-
+    float expTime = ptrExpTest->GetValue();
+    ROS_DEBUG_STREAM("Exposure Time: "<< expTime <<endl);
 }
+
 bool acquisition::Camera::verifyBinning(int binningDesired) {
     int actualBinningX =  (pCam_ ->SensorWidth())/(pCam_ ->Width());
     int actualBinningY =  (pCam_ ->SensorHeight())/(pCam_ ->Height());

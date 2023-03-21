@@ -12,6 +12,13 @@ using namespace Spinnaker::GenICam;
 using namespace cv;
 using namespace std;
 
+namespace fp {
+    struct ChunkData {
+        double exposure_time_ = 0.0; // ms
+        double gain_ = 0.0;          // dB
+    };
+}
+
 namespace acquisition {
 
     class Camera {
@@ -69,10 +76,9 @@ namespace acquisition {
         bool verifyBinning(int binningDesired);
         void calibrationParamsTest(int calibrationWidth, int calibrationHeight);
         
-    private:
-
         Mat convert_to_mat(ImagePtr);
-        
+
+    private:       
         CameraPtr pCam_;
         int64_t timestamp_;
         int frameID_;

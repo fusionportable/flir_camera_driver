@@ -173,6 +173,8 @@ void acquisition::Capture::init_variables_register_to_ros() {
     dynamicReCfgServer_->setCallback(dynamicReCfgServerCB_t);
 
 }
+
+// NOTE(gogojjh): Initialization, load cameras using the Spinnaker API
 void acquisition::Capture::load_cameras() {
 
     // Retrieve list of cameras from the system
@@ -194,7 +196,7 @@ void acquisition::Capture::load_cameras() {
     bool master_set = false;
     int cam_counter = 0;
     
-    for (int j=0; j<cam_ids_.size(); j++) {
+    for (int j = 0; j < cam_ids_.size(); j++) {
         bool current_cam_found=false;
         for (int i=0; i<numCameras_; i++) {
         
@@ -217,89 +219,25 @@ void acquisition::Capture::load_cameras() {
                 Mat img;
                 frames_.push_back(img);
                 time_stamps_.push_back("");
-        
-                cams.push_back(cam);
-                
-                //** define topic name of each camera
-                if(j==0)
-                camera_image_pubs.push_back(it_->advertiseCamera("stereo/frame_right/image_raw", 1));
-                else if (j==1)
-                camera_image_pubs.push_back(it_->advertiseCamera("stereo/frame_left/image_raw", 1));
-                else if (j==2)
-                camera_image_pubs.push_back(it_->advertiseCamera("stereo/vehicle_frame_left/image_raw", 1));
-                else if (j==3)
-                camera_image_pubs.push_back(it_->advertiseCamera("stereo/vehicle_frame_right/image_raw", 1));
-                else
-                camera_image_pubs.push_back(it_->advertiseCamera("stereo/"+cam_names_[j]+"/image_raw", 1));
-                //camera_info_pubs.push_back(nh_.advertise<sensor_msgs::CameraInfo>("camera_array/"+cam_names_[j]+"/camera_info", 1));
-
+                fp::ChunkData chunk_data;
+                frame_chunk_data_.push_back(chunk_data);
+                cams.push_back(cam);              
+                if(j == 0){
+                    camera_image_pubs.push_back(it_->advertise("stereo/frame_left/image_raw", 1));
+                }
+                else if (j == 1) {
+                    camera_image_pubs.push_back(it_->advertise("stereo/frame_right/image_raw", 1));
+                }
+                else if (j == 2) {
+                    camera_image_pubs.push_back(it_->advertise("stereo/vehicle_frame_left/image_raw", 1));
+                }
+                else if (j == 3) {
+                    camera_image_pubs.push_back(it_->advertise("stereo/vehicle_frame_right/image_raw", 1));
+                }
+                else {
+                    camera_image_pubs.push_back(it_->advertise("stereo/"+cam_names_[j]+"/image_raw", 1));
+                }
                 img_msgs.push_back(sensor_msgs::ImagePtr());
-
-                sensor_msgs::CameraInfoPtr ci_msg(new sensor_msgs::CameraInfo());
-
-                //int image_width = 0;
-                //int image_height = 0;
-                nh_pvt_.getParam("image_height", image_height_);
-                nh_pvt_.getParam("image_width", image_width_);
-                // full resolution image_size
-                ci_msg->height = image_height_;
-                ci_msg->width = image_width_;
-                                
-                std::string distortion_model = ""; 
-                nh_pvt_.getParam("distortion_model", distortion_model);
-
-                // distortion
-                ci_msg->distortion_model = distortion_model;
-                // binning
-                ci_msg->binning_x = binning_;
-                ci_msg->binning_y = binning_;
-                
-                if (region_of_interest_set_ && (region_of_interest_width_!=0 || region_of_interest_height_!=0)){
-                    ci_msg->roi.do_rectify = true;
-                    ci_msg->roi.width = region_of_interest_width_;
-                    ci_msg->roi.height = region_of_interest_height_;
-                    ci_msg->roi.x_offset = region_of_interest_x_offset_;
-                    ci_msg->roi.y_offset = region_of_interest_y_offset_;
-                }
-            
-                if (PUBLISH_CAM_INFO_){
-                    ci_msg->D = distortion_coeff_vec_[j];
-                    // intrinsic coefficients
-                    for (int count = 0; count<intrinsic_coeff_vec_[j].size();count++){
-                        ci_msg->K[count] = intrinsic_coeff_vec_[j][count];
-                    }
-                    // Rectification matrix
-                    if (!rect_coeff_vec_.empty()) 
-                        ci_msg->R = {
-                            rect_coeff_vec_[j][0], rect_coeff_vec_[j][1], 
-                            rect_coeff_vec_[j][2], rect_coeff_vec_[j][3], 
-                            rect_coeff_vec_[j][4], rect_coeff_vec_[j][5], 
-                            rect_coeff_vec_[j][6], rect_coeff_vec_[j][7], 
-                            rect_coeff_vec_[j][8]};
-                    // Projection/camera matrix
-                    if (!proj_coeff_vec_.empty()){
-                        ci_msg->P = {
-                            proj_coeff_vec_[j][0], proj_coeff_vec_[j][1], 
-                            proj_coeff_vec_[j][2], proj_coeff_vec_[j][3], 
-                            proj_coeff_vec_[j][4], proj_coeff_vec_[j][5], 
-                            proj_coeff_vec_[j][6], proj_coeff_vec_[j][7], 
-                            proj_coeff_vec_[j][8], proj_coeff_vec_[j][9], 
-                            proj_coeff_vec_[j][10], proj_coeff_vec_[j][11]};
-                    }
-                    //else if(numCameras_ == 1){
-                    else if(cam_ids_.size() == 1){  
-                        // for case of monocular camera, P[1:3,1:3]=K
-                        ci_msg->P = {
-                        intrinsic_coeff_vec_[j][0], intrinsic_coeff_vec_[j][1],
-                        intrinsic_coeff_vec_[j][2], 0, 
-                        intrinsic_coeff_vec_[j][3], intrinsic_coeff_vec_[j][4],
-                        intrinsic_coeff_vec_[j][5], 0, 
-                        intrinsic_coeff_vec_[j][6], intrinsic_coeff_vec_[j][7],
-                        intrinsic_coeff_vec_[j][8], 0};
-                    }
-                }
-
-                cam_info_msgs.push_back(ci_msg);
                 cam_counter++;
             }
         }
@@ -311,7 +249,7 @@ void acquisition::Capture::load_cameras() {
     // numCameras_ variable is used in other methods where it means size of cams list.
     numCameras_ = cams.size();
     // setting PUBLISH_CAM_INFO_ to true so export to ros method can publish it_.advertiseCamera msg with zero intrisics and distortion coeffs.
-    PUBLISH_CAM_INFO_ = true;
+    PUBLISH_CAM_INFO_ = false;
 
     if (!EXTERNAL_TRIGGER_)
         ROS_ASSERT_MSG(master_set,"The camera supposed to be the master isn't connected!");
@@ -644,7 +582,6 @@ void acquisition::Capture::read_parameters() {
 
 }
 
-
 void acquisition::Capture::init_array() {
     
     ROS_INFO_STREAM("*** FLUSH SEQUENCE ***");
@@ -680,7 +617,6 @@ void acquisition::Capture::init_cameras(bool soft = false) {
             cams[i].init();
 
             if (!soft) {
-
                 cams[i].set_color(color_);
                 cams[i].setIntValue("BinningHorizontal", binning_);
                 cams[i].setIntValue("BinningVertical", binning_);                
@@ -879,11 +815,10 @@ void acquisition::Capture::export_to_ROS() {
             else if (latest_imu_trigger_count_ - prev_imu_trigger_count_ == 0){
                 double wait_time_start = ros::Time::now().toSec();
                 ROS_WARN("Difference in trigger count zero, latest_count = %d and prev_count = %d",latest_imu_trigger_count_,prev_imu_trigger_count_);
-                while(latest_imu_trigger_count_ - prev_imu_trigger_count_ == 0){
-                  
+                while (latest_imu_trigger_count_ - prev_imu_trigger_count_ == 0) {
                     ros::Duration(0.0001).sleep();
                 }
-                ROS_INFO_STREAM("Time gap for sync messages: "<<ros::Time::now().toSec() - wait_time_start);
+                ROS_INFO_STREAM("Time gap for sync messages: " << ros::Time::now().toSec() - wait_time_start);
             }
             img_msg_header.stamp = latest_imu_trigger_time_;
             prev_imu_trigger_count_ = latest_imu_trigger_count_;
@@ -893,28 +828,35 @@ void acquisition::Capture::export_to_ROS() {
         }
     #endif
 
-     #ifndef trigger_msgs_FOUND
+    #ifndef trigger_msgs_FOUND
         img_msg_header.stamp = mesg.header.stamp;
     #endif
     
     string frame_id_prefix;
-    if (tf_prefix_.compare("") != 0)
+    if (tf_prefix_.compare("") != 0) {
         frame_id_prefix = tf_prefix_ +"/";
-    else frame_id_prefix="";
+    } else {
+        frame_id_prefix="";
+    }
 
     for (unsigned int i = 0; i < numCameras_; i++) {
-        img_msg_header.frame_id = frame_id_prefix + "cam_"+to_string(i)+"_optical_frame";
-        cam_info_msgs[i]->header = img_msg_header;
-
-        if(color_)
-            img_msgs[i]=cv_bridge::CvImage(img_msg_header, "bgr8", frames_[i]).toImageMsg();
+        // NOTE(gogojjh): set the frame_id of camera
+        if (i == 0) {
+            img_msg_header.frame_id = "frame_cam00";
+        } else if (i == 1) {
+            img_msg_header.frame_id = "frame_cam01";
+        } else if (i == 2) {
+            img_msg_header.frame_id = "vehicle_frame_cam00";
+        } else if (i == 3) {
+            img_msg_header.frame_id = "vehicle_frame_cam01";
+        }
+        if (color_)
+            img_msgs[i] = cv_bridge::CvImage(img_msg_header, "bgr8", frames_[i]).toImageMsg();
         else
-            img_msgs[i]=cv_bridge::CvImage(img_msg_header, "mono8", frames_[i]).toImageMsg();
-
-        camera_image_pubs[i].publish(img_msgs[i],cam_info_msgs[i]);
-
+            img_msgs[i] = cv_bridge::CvImage(img_msg_header, "mono8", frames_[i]).toImageMsg();
+        camera_image_pubs[i].publish(img_msgs[i]);
     }
-    export_to_ROS_time_ = ros::Time::now().toSec()-t;;
+    export_to_ROS_time_ = ros::Time::now().toSec() - t;
 }
 
 void acquisition::Capture::save_binary_frames(int dump) {
@@ -955,172 +897,81 @@ void acquisition::Capture::save_binary_frames(int dump) {
     
 }
 
+// TODO(gogojjh): use parallel thread to capture different images
 void acquisition::Capture::get_mat_images() {
-    //ros time stamp creation
-    //mesg.header.stamp = ros::Time::now();
-    //mesg.time = ros::Time::now();
-    double t = ros::Time::now().toSec();
-    
+    double t = ros::Time::now().toSec();   
     ostringstream ss;
-    ss<<"frameIDs: [";
-    
+    ss << "frameIDs: [";
     int frameID;
     int fid_mismatch = 0;
-   
+    for (int i = 0; i < numCameras_; i++) {
+        // NOTE(gogojjh):
+        ImagePtr image = cams[i].grab_frame();
+        ChunkData chunkdata = image->GetChunkData();
+        frame_chunk_data_[i].exposure_time_ = static_cast<double>(chunkdata.GetExposureTime()) / 1000.0;
+        frame_chunk_data_[i].gain_ = chunkdata.GetGain();
+        std::cout << " camera: exposure: "<< frame_chunk_data_[i].exposure_time_ 
+                  << "ms; gain: "<< frame_chunk_data_[i].gain_<< "dB" << std::endl;        
+        double get_image_time = ros::Time::now().toSec();
+        double cap_image_time = get_image_time - frame_chunk_data_[i].exposure_time_ / 2 / 1000.0;
 
-    for (int i=0; i<numCameras_; i++) {
-        //ROS_INFO_STREAM("CAM ID IS "<< i);
-        frames_[i] = cams[i].grab_mat_frame();
-        //ROS_INFO("sucess");
+        // frames_[i] = cams[i].grab_mat_frame(frame_chunk_data_[i]);
+        frames_[i] = cams[i].convert_to_mat(image);
         time_stamps_[i] = cams[i].get_time_stamp();
-
-
-        if (i==0)
+        if (i == 0) {
             frameID = cams[i].get_frame_id();
-        else
-            if (cams[i].get_frame_id() != frameID)
-                fid_mismatch = 1;
-        
+        } else {
+            if (cams[i].get_frame_id() != frameID) fid_mismatch = 1;
+        }
         if (i == numCameras_-1)
             ss << cams[i].get_frame_id() << "]";
         else
             ss << cams[i].get_frame_id() << ", ";
-        
     }
+
+    // NOTE(gogojjh): need to address the latency issue
     mesg.header.stamp = ros::Time::now();
     mesg.time = ros::Time::now();
     string message = ss.str();
     ROS_DEBUG_STREAM(message);
-
     if (fid_mismatch)
-        ROS_WARN_STREAM("Frame IDs for grabbed set of images did not match!");
-    
-    toMat_time_ = ros::Time::now().toSec() - t;
-    
+        ROS_WARN_STREAM("Frame IDs for grabbed set of images did not match!");  
+    toMat_time_ = ros::Time::now().toSec() - t;   
 }
 
 void acquisition::Capture::run_soft_trig() {
     achieved_time_ = ros::Time::now().toSec();
     ROS_INFO("*** ACQUISITION ***");
-    
     start_acquisition();
 
     // Camera directories created at first save
-    
-    if (LIVE_)namedWindow("Acquisition", CV_WINDOW_NORMAL | CV_WINDOW_KEEPRATIO);
-
-    int count = 0;
-    
+    int count = 0;   
     if (!EXTERNAL_TRIGGER_) {
         cams[MASTER_CAM_].trigger();
-    }
-    
+    }  
     get_mat_images();
-    if (SAVE_) {
-        count++;
-        if (SAVE_BIN_)
-            save_binary_frames(0);
-        else
-            save_mat_frames(0);
-    }
-
-    if(!VERIFY_BINNING_){
-    // // Gets called only once, when first image is being triggered
-    //     for (unsigned int i = 0; i < numCameras_; i++) {
-    //         //verify if binning is set successfully
-    //         if (!region_of_interest_set_){
-    //             ROS_ASSERT_MSG(cams[i].verifyBinning(binning_), " Failed to set Binning= %d, could be either due to Invalid binning value, try changing binning value or due to spinnaker api bug - failing to set lower binning than previously set value - solution: unplug usb camera and re-plug it back and run to node with desired valid binning", binning_);
-    //         }
-    //         // warn if full sensor resolution is not same as calibration resolution
-    //         cams[i].calibrationParamsTest(image_width_,image_height_);
-    //     }
-    // VERIFY_BINNING_ = true;
-    }
-
-    
    
+    // NOTE(gogojjh): the main program
     ros::Rate ros_rate(soft_framerate_);
     try{
-        while( ros::ok() ) {
-
+        while (ros::ok() ) {
             double t = ros::Time::now().toSec();
-
-            if (LIVE_) {
-                if (GRID_VIEW_) {
-                    update_grid();
-                    imshow("Acquisition", grid_);
-                } else {
-                    imshow("Acquisition", frames_[CAM_]);
-                    char title[50];
-                    sprintf(title, "cam # = %d, cam ID = %s, cam name = %s", CAM_, cam_ids_[CAM_].c_str(), cam_names_[CAM_].c_str());
-                    displayOverlay("Acquisition", title);
-                }
-            }
-
-            // int key = cvWaitKey(1);
-            // ROS_DEBUG_STREAM("Key press: "<<(key & 255)<<endl);
-            
-            // if ( (key & 255)!=255 ) {
-
-            //     if ( (key & 255)==83 ) {
-            //         if (CAM_<numCameras_-1) // RIGHT ARROW
-            //             CAM_++;
-            //     } else if( (key & 255)==81 ) { // LEFT ARROW
-            //         if (CAM_>0)
-            //             CAM_--;
-            //     } else if( (key & 255)==32 && !SAVE_) { // SPACE
-            //         ROS_INFO_STREAM("Saving frame...");
-            //         if (SAVE_BIN_)
-            //             save_binary_frames(0);
-            //         else{
-            //             save_mat_frames(0);
-            //             if (!EXPORT_TO_ROS_){
-            //                 ROS_INFO_STREAM("Exporting frames to ROS...");
-            //                 export_to_ROS();
-            //             }
-            //         }
-            //     } else if( (key & 255)==27 ) {  // ESC
-            //         ROS_INFO_STREAM("Terminating...");
-            //         cvDestroyAllWindows();
-            //         ros::shutdown();
-            //         break;
-            //     }
-            //     ROS_DEBUG_STREAM("active cam switched to: "<<CAM_);
-            // }
-
             double disp_time_ = ros::Time::now().toSec() - t;
 
             // Call update functions
-
             if (!EXTERNAL_TRIGGER_) {
                 cams[MASTER_CAM_].trigger();
             }
             get_mat_images();
 
-            if (SAVE_) {
-                count++;
-                if (SAVE_BIN_)
-                    save_binary_frames(0);
-                else
-                    save_mat_frames(0);
-            }
-
-            if (FIXED_NUM_FRAMES_) {
-                ROS_INFO_STREAM(" Recorded frames "<<count<<" / "<<nframes_);
-                if (count > nframes_) {
-                    ROS_INFO_STREAM(nframes_ << " frames recorded. Terminating...");
-                    cvDestroyAllWindows();
-                    break;
-                }
-            }
-
             if (EXPORT_TO_ROS_) export_to_ROS();
-            //cams[MASTER_CAM_].targetGreyValueTest();
+            // cams[MASTER_CAM_].targetGreyValueTest();
+
             // ros publishing messages
             acquisition_pub.publish(mesg);
 
             // double total_time = grab_time_ + toMat_time_ + disp_time_ + save_mat_time_;
-            double total_time = toMat_time_ + disp_time_ + save_mat_time_+export_to_ROS_time_;
+            double total_time = toMat_time_ + disp_time_ + save_mat_time_ + export_to_ROS_time_;
             achieved_time_ = ros::Time::now().toSec() - achieved_time_;
 
             ROS_INFO_COND(TIME_BENCHMARK_,
@@ -1130,8 +981,7 @@ void acquisition::Capture::run_soft_trig() {
             ROS_INFO_COND(TIME_BENCHMARK_,"Times (ms):- grab: %.1f, disp: %.1f, save: %.1f, exp2ROS: %.1f",
                           toMat_time_*1000,disp_time_*1000,save_mat_time_*1000,export_to_ROS_time_*1000);
             
-            achieved_time_=ros::Time::now().toSec();
-            
+            achieved_time_=ros::Time::now().toSec();           
             if (!EXTERNAL_TRIGGER_ && SOFT_FRAME_RATE_CTRL_) {ros_rate.sleep();}
         }
     }
