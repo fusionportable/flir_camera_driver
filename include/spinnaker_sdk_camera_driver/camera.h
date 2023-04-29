@@ -5,6 +5,8 @@
 #include "serialization.h"
 #include <boost/archive/binary_oarchive.hpp>
 #include <boost/filesystem.hpp>
+#include <iostream>
+#include <iomanip> 
 
 using namespace Spinnaker;
 using namespace Spinnaker::GenApi;
@@ -12,6 +14,7 @@ using namespace Spinnaker::GenICam;
 using namespace cv;
 using namespace std;
 
+// NOTE(gogojjh): added by gogojjh to stoer camera chunk data
 namespace fp {
     struct ChunkData {
         double exposure_time_ = 0.0; // ms

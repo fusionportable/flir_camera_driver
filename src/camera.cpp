@@ -43,7 +43,6 @@ ImagePtr acquisition::Camera::grab_frame() {
         // Check if the Image is complete
         if (pResultImage->IsIncomplete()) {
             ROS_WARN_STREAM("Image incomplete with image status " << pResultImage->GetImageStatus() << "!");
-
         } else {
             timestamp_ = pResultImage->GetTimeStamp();
             if (frameID_ >= 0) {
@@ -57,6 +56,7 @@ ImagePtr acquisition::Camera::grab_frame() {
 
         }
         ROS_DEBUG_STREAM("Grabbed frame from camera " << get_id() << " with timestamp " << timestamp_*1000);
+        // std::cout << std::fixed << std::setprecision(9) << frameID_ << " " << timestamp_*1000 << std::endl;
         return pResultImage;
     }
     catch(Spinnaker::Exception &e){

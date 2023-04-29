@@ -738,7 +738,6 @@ void acquisition::Capture::init_cameras(bool soft = false) {
 }
 
 void acquisition::Capture::start_acquisition() {
-
     for (int i = numCameras_-1; i>=0; i--)
         cams[i].begin_acquisition();
 
@@ -953,19 +952,19 @@ void acquisition::Capture::get_mat_images() {
         ROS_WARN_STREAM("Frame IDs for grabbed set of images did not match!");  
 }
 
+// NOTE(gogojjh): added by gogojjh
 void acquisition::Capture::export_image_to_ROS(const int i) {
     double t = ros::Time::now().toSec();
-
     // Capture new image using the Spinnaker API
     ImagePtr image = cams[i].grab_frame();
     ChunkData chunkdata = image->GetChunkData();
-    frame_chunk_data_[i].exposure_time_ = static_cast<double>(chunkdata.GetExposureTime()) / 1000.0;
+    frame_chunk_data_[i].exposure_time_ = static_cast<double>(chunkdata.GetExposureTime()) / 1000.0; // ms
     frame_chunk_data_[i].gain_ = chunkdata.GetGain();
-    double get_image_time = ros::Time::now().toSec();
-    double cap_image_time = get_image_time - frame_chunk_data_[i].exposure_time_ / 2 / 1000.0;
-    // std::cout << i << ": camera: exposure: "<< frame_chunk_data_[i].exposure_time_ 
-    //           << "ms; gain: "<< frame_chunk_data_[i].gain_<< "dB; "  
-    //           << std::fixed << std::setprecision(9) << cap_image_time << std::endl;
+    double get_image_time = ros::Time::now().toSec(); // s
+    double cap_image_time = get_image_time - static_cast<double>(chunkdata.GetExposureTime()) / 1000.0 / 1000.0 / 2;
+    std::cout << i << " camera. Exposure: "<< frame_chunk_data_[i].exposure_time_ 
+              << "ms. Gain: "<< frame_chunk_data_[i].gain_<< "dB; "  
+              << std::fixed << std::setprecision(9) << cap_image_time << std::endl;
 
     // Convert the image to OpenCV Mat
     frames_[i] = cams[i].convert_to_mat(image);
@@ -1003,6 +1002,7 @@ void acquisition::Capture::export_image_to_ROS(const int i) {
     //     img_msg_header.stamp = mesg.header.stamp;
     // #endif
 
+    // Publish image data
     if (i == 0) {
         img_msg_header.frame_id = "frame_cam00";
     } else if (i == 1) {
@@ -1018,12 +1018,12 @@ void acquisition::Capture::export_image_to_ROS(const int i) {
         img_msgs[i] = cv_bridge::CvImage(img_msg_header, "mono8", frames_[i]).toImageMsg();
     camera_image_pubs[i].publish(img_msgs[i]);
 
+    // Publish chunkdata
     geometry_msgs::PointStamped msg;
     msg.header = img_msg_header;
     msg.point.x = frame_chunk_data_[i].exposure_time_;
     msg.point.y = frame_chunk_data_[i].gain_;
     camera_chunk_data_pubs[i].publish(msg);
-
     // printf("(in parallel) export to ROS_Times (ms): %.1f\n", (ros::Time::now().toSec() - t) * 1000);
 }
 
@@ -1088,7 +1088,7 @@ void acquisition::Capture::run_soft_trig() {
 }
 
 // NOTE(gogojjh): The main function iteratively captures images in parallel
-// Assumption: 
+// Default parameters: 
 //  EXTERNAL_TRIGGER_ = true; // external trigger
 //  EXPORT_TO_ROS_ = true;    // export data to ros
 void acquisition::Capture::run_soft_trig_in_parallel() {
@@ -1098,17 +1098,15 @@ void acquisition::Capture::run_soft_trig_in_parallel() {
     try{
         while (ros::ok() ) {
             double t = ros::Time::now().toSec();
-
             std::vector<std::thread> threads_image_to_ROS;
             for (int i = 0; i < numCameras_; i++) {    
                 threads_image_to_ROS.emplace_back(&acquisition::Capture::export_image_to_ROS, this, i);               
             }
-
             for (auto &thread : threads_image_to_ROS) {
                 thread.join();
             }
             double total_time = ros::Time::now().toSec() - t;
-            printf("export_image_to_ROS Times (ms): %.1f\n", total_time * 1000);
+            // printf("export_image_to_ROS Times (ms): %.1f\n", total_time * 1000);
             if (!EXTERNAL_TRIGGER_ && SOFT_FRAME_RATE_CTRL_) {ros_rate.sleep();}
         }
     }
@@ -1345,7 +1343,9 @@ void acquisition::Capture::run() {
     if (MAX_RATE_SAVE_) {
         run_mt();
     } else {
+        /////// The original implementation: process images in seralization
         // run_soft_trig();
+        /////// process images in parallel
         // NOTE(gogojjh):
         run_soft_trig_in_parallel();
     }
