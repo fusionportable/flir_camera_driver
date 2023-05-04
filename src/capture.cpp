@@ -875,6 +875,13 @@ void acquisition::Capture::export_to_ROS() {
         else
             img_msgs[i] = cv_bridge::CvImage(img_msg_header, "mono8", frames_[i]).toImageMsg();
         camera_image_pubs[i].publish(img_msgs[i]);
+
+        // Publish chunkdata
+        geometry_msgs::PointStamped msg;
+        msg.header = img_msg_header;
+        msg.point.x = frame_chunk_data_[i].exposure_time_;
+        msg.point.y = frame_chunk_data_[i].gain_;
+        camera_chunk_data_pubs[i].publish(msg); 
     }
 }
 
@@ -927,7 +934,7 @@ void acquisition::Capture::get_mat_images() {
         frame_chunk_data_[i].exposure_time_ = static_cast<double>(chunkdata.GetExposureTime()) / 1000.0;
         frame_chunk_data_[i].gain_ = chunkdata.GetGain();
         std::cout << " camera: exposure: "<< frame_chunk_data_[i].exposure_time_ 
-                  << "ms; gain: "<< frame_chunk_data_[i].gain_<< "dB" << std::endl;        
+                  << "ms; gain: "<< frame_chunk_data_[i].gain_<< "dB" << std::endl;         
 
         // frames_[i] = cams[i].grab_mat_frame(frame_chunk_data_[i]);
         frames_[i] = cams[i].convert_to_mat(image);
@@ -1344,10 +1351,10 @@ void acquisition::Capture::run() {
         run_mt();
     } else {
         /////// The original implementation: process images in seralization
-        // run_soft_trig();
+        run_soft_trig();
         /////// process images in parallel
         // NOTE(gogojjh):
-        run_soft_trig_in_parallel();
+        // run_soft_trig_in_parallel();
     }
     ROS_DEBUG("Run completed");
 }
