@@ -53,7 +53,6 @@ ImagePtr acquisition::Camera::grab_frame() {
                 frameID_ = pResultImage->GetFrameID();
                 ROS_ASSERT_MSG(frameID_ == 0 ,"First frame ID was not zero! Might cause sync issues later...");
             }
-
         }
         ROS_DEBUG_STREAM("Grabbed frame from camera " << get_id() << " with timestamp " << timestamp_*1000);
         // std::cout << std::fixed << std::setprecision(9) << frameID_ << " " << timestamp_*1000 << std::endl;

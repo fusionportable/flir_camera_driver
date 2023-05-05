@@ -27,6 +27,8 @@
 #include <mutex>
 #include <iomanip> 
 #include <geometry_msgs/PointStamped.h>
+// Timer
+#include "spinnaker_sdk_camera_driver/TicToc.hpp"
 
 #ifdef trigger_msgs_FOUND
   #include <trigger_msgs/sync_trigger.h>
